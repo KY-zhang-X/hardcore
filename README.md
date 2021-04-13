@@ -1,2 +1,2 @@
-# ucore
-ucore comment &amp; modify for OS course design
+# hardcore
+ucore modify for OS course design

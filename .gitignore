@@ -1,3 +1,9 @@
+# Directories
+bin/
+obj/
+disk0/
+.vscode/
+
 # Prerequisites
 *.d
 
