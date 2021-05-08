@@ -187,18 +187,6 @@ struct taskstate {
 
 #endif /* !__ASSEMBLER__ */
 
-// A linear address 'la' has a three-part structure as follows:
-//
-// +--------10------+-------10-------+---------12----------+
-// | Page Directory |   Page Table   | Offset within Page  |
-// |      Index     |     Index      |                     |
-// +----------------+----------------+---------------------+
-//  \--- PDX(la) --/ \--- PTX(la) --/ \---- PGOFF(la) ----/
-//  \----------- PPN(la) -----------/
-//
-// The PDX, PTX, PGOFF, and PPN macros decompose linear addresses as shown.
-// To construct a linear address la from PDX(la), PTX(la), and PGOFF(la),
-// use PGADDR(PDX(la), PTX(la), PGOFF(la)).
 
 // page directory index
 #define PDX(la) ((((uintptr_t)(la)) >> PDXSHIFT) & 0x3FF)

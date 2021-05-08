@@ -66,7 +66,7 @@
  *
  * */
 
-/* All physical memory mapped at this address */
+ /* All physical memory mapped at this address */
 #define KERNBASE            0xC0000000
 #define KMEMSIZE            0x38000000                  // the maximum amount of physical memory
 #define KERNTOP             (KERNBASE + KMEMSIZE)
@@ -113,12 +113,12 @@ typedef pte_t swap_entry_t; //the pte can also be a swap entry
 #define E820_ARR            2       // address range reserved
 
 struct e820map {
-    int nr_map;
-    struct {
-        uint64_t addr;
-        uint64_t size;
-        uint32_t type;
-    } __attribute__((packed)) map[E820MAX];
+	int nr_map;
+	struct {
+		uint64_t addr;
+		uint64_t size;
+		uint32_t type;
+	} __attribute__((packed)) map[E820MAX];
 };
 
 /* *
@@ -127,13 +127,13 @@ struct e820map {
  * that convert Page to other data types, such as phyical address.
  * */
 struct Page {
-    int ref;                        // page frame's reference counter
-    uint32_t flags;                 // array of flags that describe the status of the page frame
-    unsigned int property;          // used in buddy system, stores the order (the X in 2^X) of the continuous memory block
-    int zone_num;                   // used in buddy system, the No. of zone which the page belongs to
-    list_entry_t page_link;         // free list link
-    list_entry_t pra_page_link;     // used for pra (page replace algorithm)
-    uintptr_t pra_vaddr;            // used for pra (page replace algorithm)
+	int ref;                        // page frame's reference counter
+	uint32_t flags;                 // array of flags that describe the status of the page frame
+	unsigned int property;          // used in buddy system, stores the order (the X in 2^X) of the continuous memory block
+	int zone_num;                   // used in buddy system, the No. of zone which the page belongs to
+	list_entry_t page_link;         // free list link
+	list_entry_t pra_page_link;     // used for pra (page replace algorithm)
+	uintptr_t pra_vaddr;            // used for pra (page replace algorithm)
 };
 
 /* Flags describing the status of a page frame */
@@ -153,8 +153,8 @@ struct Page {
 
 /* free_area_t - maintains a doubly linked list to record free (unused) pages */
 typedef struct {
-    list_entry_t free_list;         // the list header
-    unsigned int nr_free;           // # of free pages in this free list
+	list_entry_t free_list;         // the list header
+	unsigned int nr_free;           // # of free pages in this free list
 } free_area_t;
 
 /* for slab style kmalloc */
