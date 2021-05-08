@@ -6,22 +6,11 @@
 #include <pmm.h>
 #include <vmm.h>
 
-/* *
- * swap_entry_t
- * --------------------------------------------
- * |         offset        |   reserved   | 0 |
- * --------------------------------------------
- *           24 bits            7 bits    1 bit
- * */
 
 #define MAX_SWAP_OFFSET_LIMIT                   (1 << 24)
 
 extern size_t max_swap_offset;
 
-/* *
- * swap_offset - takes a swap_entry (saved in pte), and returns
- * the corresponding offset in swap mem_map.
- * */
 #define swap_offset(entry) ({                                       \
                size_t __offset = (entry >> 8);                        \
                if (!(__offset > 0 && __offset < max_swap_offset)) {    \

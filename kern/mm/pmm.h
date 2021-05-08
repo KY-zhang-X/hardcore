@@ -7,9 +7,6 @@
 #include <atomic.h>
 #include <assert.h>
 
-// pmm_manager is a physical memory management class. A special pmm manager - XXX_pmm_manager
-// only needs to implement the methods in pmm_manager class, then XXX_pmm_manager can be used
-// by ucore to manage the total physical memory space.
 struct pmm_manager {
     const char *name;                                 // XXX_pmm_manager's name
     void (*init)(void);                               // initialize internal description&management data structure
@@ -43,17 +40,10 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm);
 void load_esp0(uintptr_t esp0);
 void tlb_invalidate(pde_t *pgdir, uintptr_t la);
 struct Page *pgdir_alloc_page(pde_t *pgdir, uintptr_t la, uint32_t perm);
-void unmap_range(pde_t *pgdir, uintptr_t start, uintptr_t end);
-void exit_range(pde_t *pgdir, uintptr_t start, uintptr_t end);
-int copy_range(pde_t *to, pde_t *from, uintptr_t start, uintptr_t end, bool share);
 
 void print_pgdir(void);
 
-/* *
- * PADDR - takes a kernel virtual address (an address that points above KERNBASE),
- * where the machine's maximum 256MB of physical memory is mapped and returns the
- * corresponding physical address.  It panics if you pass it a non-kernel virtual address.
- * */
+
 #define PADDR(kva) ({                                                   \
             uintptr_t __m_kva = (uintptr_t)(kva);                       \
             if (__m_kva < KERNBASE) {                                   \
@@ -62,10 +52,7 @@ void print_pgdir(void);
             __m_kva - KERNBASE;                                         \
         })
 
-/* *
- * KADDR - takes a physical address and returns the corresponding kernel virtual
- * address. It panics if you pass an invalid physical address.
- * */
+
 #define KADDR(pa) ({                                                    \
             uintptr_t __m_pa = (pa);                                    \
             size_t __m_ppn = PPN(__m_pa);                               \
@@ -143,5 +130,7 @@ page_ref_dec(struct Page *page) {
 
 extern char bootstack[], bootstacktop[];
 
+extern void * kmalloc(size_t n);
+extern void kfree(void *ptr, size_t n);
 #endif /* !__KERN_MM_PMM_H__ */
 

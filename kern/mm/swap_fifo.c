@@ -6,30 +6,10 @@
 #include <swap_fifo.h>
 #include <list.h>
 
-/* [wikipedia]The simplest Page Replacement Algorithm(PRA) is a FIFO algorithm. The first-in, first-out
- * page replacement algorithm is a low-overhead algorithm that requires little book-keeping on
- * the part of the operating system. The idea is obvious from the name - the operating system
- * keeps track of all the pages in memory in a queue, with the most recent arrival at the back,
- * and the earliest arrival in front. When a page needs to be replaced, the page at the front
- * of the queue (the oldest page) is selected. While FIFO is cheap and intuitive, it performs
- * poorly in practical application. Thus, it is rarely used in its unmodified form. This
- * algorithm experiences Belady's anomaly.
- *
- * Details of FIFO PRA
- * (1) Prepare: In order to implement FIFO PRA, we should manage all swappable pages, so we can
- *              link these pages into pra_list_head according the time order. At first you should
- *              be familiar to the struct list in list.h. struct list is a simple doubly linked list
- *              implementation. You should know howto USE: list_init, list_add(list_add_after),
- *              list_add_before, list_del, list_next, list_prev. Another tricky method is to transform
- *              a general list struct to a special struct (such as struct page). You can find some MACRO:
- *              le2page (in memlayout.h), (in future labs: le2vma (in vmm.h), le2proc (in proc.h),etc.
- */
+#include <pmm.h>
 
 list_entry_t pra_list_head;
-/*
- * (2) _fifo_init_mm: init pra_list_head and let  mm->sm_priv point to the addr of pra_list_head.
- *              Now, From the memory control struct mm_struct, we can access FIFO PRA
- */
+
 static int
 _fifo_init_mm(struct mm_struct *mm)
 {     
@@ -38,9 +18,7 @@ _fifo_init_mm(struct mm_struct *mm)
      //cprintf(" mm->sm_priv %x in fifo_init_mm\n",mm->sm_priv);
      return 0;
 }
-/*
- * (3)_fifo_map_swappable: According FIFO PRA, we should link the most recent arrival page at the back of pra_list_head qeueue
- */
+
 static int
 _fifo_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int swap_in)
 {
@@ -48,27 +26,17 @@ _fifo_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int
     list_entry_t *entry=&(page->pra_page_link);
  
     assert(entry != NULL && head != NULL);
-    //record the page access situlation
-    /*LAB3 EXERCISE 2: YOUR CODE*/ 
-    //(1)link the most recent arrival page at the back of the pra_list_head qeueue.
     list_add(head, entry);
     return 0;
 }
-/*
- *  (4)_fifo_swap_out_victim: According FIFO PRA, we should unlink the  earliest arrival page in front of pra_list_head qeueue,
- *                            then assign the value of *ptr_page to the addr of this page.
- */
+
+//先进先出算法
 static int
 _fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick)
 {
      list_entry_t *head=(list_entry_t*) mm->sm_priv;
          assert(head != NULL);
      assert(in_tick==0);
-     /* Select the victim */
-     /*LAB3 EXERCISE 2: YOUR CODE*/ 
-     //(1)  unlink the  earliest arrival page in front of pra_list_head qeueue
-     //(2)  assign the value of *ptr_page to the addr of this page
-     /* Select the tail */
      list_entry_t *le = head->prev;
      assert(head!=le);
      struct Page *p = le2page(le, pra_page_link);
@@ -76,6 +44,117 @@ _fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick
      assert(p !=NULL);
      *ptr_page = p;
      return 0;
+}
+
+//时钟算法
+static int
+_extended_clock(struct mm_struct *mm, struct Page ** ptr_page, int in_tick)
+{
+	list_entry_t *head = (list_entry_t*)mm->sm_priv;
+	assert(head != NULL);
+	assert(in_tick == 0);
+	list_entry_t *le = head->prev;
+	assert(head != le);
+
+	while (le != head)
+	{
+		struct Page *p = le2page(le, pra_page_link);
+		pte_t *ptep = get_pte(mm->pgdir,p->pra_vaddr,0)
+	    //如果没有被访问过，直接换出
+		if (!(*ptep & PTE_A)) 
+		{
+			list_del(le);
+			assert(p != NULL)
+			*ptr_page = p;
+			return 0;
+		}
+		*ptep ^ = PTE_A;
+		le = le->next;
+	}
+	le = le->next;
+	//都被访问过，强行换出最先进入的页面
+	while (le != head)
+	{
+		struct Page *p = le2page(le, pra_page_link);
+		pte_t *ptep = get_pte(mm->pgdir, p->pra_vaddr, 0)
+		list_del(le);
+		assert(p != NULL)
+		*ptr_page = p;
+		return 0;
+	}
+}
+
+//改进的时钟算法
+static int
+_enhanced_clock(struct mm_struct *mm, struct Page ** ptr_page, int in_tick)
+{
+	list_entry_t *head = (list_entry_t*)mm->sm_priv;
+	assert(head != NULL);
+	assert(in_tick == 0);
+	list_entry_t *le = head->prev;
+	assert(head != le);
+
+	//找最先进入且未被修改的页面
+	while (le != head)
+	{
+		struct Page *p = le2page(le, pra_page_link);
+		pte_t *ptep = get_pte(mm->pgdir, p->pra_vaddr, 0)
+			//如果没有被访问过且没有被修改
+			if (!(*ptep & PTE_A) && !(*ptep & PTE_D))
+			{
+				list_del(le);
+				assert(p != NULL)
+					*ptr_page = p;
+				return 0;
+			}
+		le = le->next;
+	}
+	le = le->next;
+	while (le != head)
+	{
+		struct Page *p = le2page(le, pra_page_link);
+		pte_t *ptep = get_pte(mm->pgdir, p->pra_vaddr, 0);
+		//如果没有被访问但是已经被被修改
+		if (!(*ptep & PTE_A) && (*ptep & PTE_D))
+		{
+			list_del(le);
+			assert(p != NULL)
+				*ptr_page = p;
+			return 0;
+		}
+		*ptep ^ = PTE_A;
+		le = le->next;
+	}
+	le = le->next;
+	while (le != head)
+	{
+		struct Page *p = le2page(le, pra_page_link);
+		pte_t *ptep = get_pte(mm->pgdir, p->pra_vaddr, 0)
+		//如果没有被修改，但是所有页都被访问过
+		if (!(*ptep & PTE_D))
+		{
+			list_del(le);
+			assert(p != NULL)
+			*ptr_page = p;
+			return 0;
+		}
+		le = le->next;
+	}
+	le = le->next;
+	while (le != head)
+	{
+		struct Page *p = le2page(le, pra_page_link);
+		pte_t *ptep = get_pte(mm->pgdir, p->pra_vaddr, 0)
+			//被修改过
+			if ((*ptep & PTE_D))
+			{
+				list_del(le);
+				assert(p != NULL)
+				*ptr_page = p;
+				return 0;
+			}
+		le = le->next;
+	}
 }
 
 static int
