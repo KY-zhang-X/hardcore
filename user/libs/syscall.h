@@ -54,6 +54,7 @@ int sys_sem(semaphore_t *sem, int *value, int type);
 //    1  表示调用 sem_wait     ，传入的 value 为 NULL
 //    2  表示调用 sem_post     ，传入的 value 为 NULL
 //    3  表示调用 sem_getvalue ，传入的 value 为 放置信号量大小的的地址
+int sys_nice(int pid, int prior);
 void sys_lab6_set_priority(uint32_t priority); //only for lab6
 
 

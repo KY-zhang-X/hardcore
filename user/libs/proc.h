@@ -38,5 +38,6 @@ struct proc_struct_user
 };
 
 int get_pdb(void *base);
+int nice(int pid, int prior);
 
 #endif /* !__USER_LIBS_PROC_H__ */

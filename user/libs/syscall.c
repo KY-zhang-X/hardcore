@@ -158,3 +158,8 @@ int sys_sem(semaphore_t *sem, int *value, int type)
 {
     return syscall(SYS_sem, sem, value, type);
 }
+
+int sys_nice(int pid, int prior)
+{
+    return syscall(SYS_nice, pid , prior);
+}

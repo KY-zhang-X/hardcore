@@ -33,6 +33,7 @@
 #define SYS_lab6_set_priority 255
 #define SYS_get_pdb 436
 #define SYS_sem 437
+#define SYS_nice 438
 
 /* SYS_fork flags */
 #define CLONE_VM            0x00000100  // set if VM shared between processes

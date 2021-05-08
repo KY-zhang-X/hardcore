@@ -212,6 +212,19 @@ sys_sem(uint32_t arg[])
     return 0;
 }
 
+static int
+sys_nice(uint32_t arg[])
+{
+    int pid = (int)arg[0];
+    int prior = (int)arg[1];
+    struct proc_struct * proc = find_proc(pid);
+    if (proc == NULL){
+        return -1;
+    }
+    proc->cfs_prior=prior;
+    return 0;
+}
+
 static int (*syscalls[])(uint32_t arg[]) = {
     [SYS_exit] sys_exit,
     [SYS_fork] sys_fork,
@@ -238,6 +251,7 @@ static int (*syscalls[])(uint32_t arg[]) = {
     [SYS_dup] sys_dup,
     [SYS_get_pdb] sys_get_pdb,
     [SYS_sem] sys_sem,
+    [SYS_nice] sys_nice,
 };
 
 #define NUM_SYSCALLS        ((sizeof(syscalls)) / (sizeof(syscalls[0])))

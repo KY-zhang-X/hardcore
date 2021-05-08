@@ -8,3 +8,8 @@ int get_pdb(void *base)
 {
     return sys_get_pdb(base);
 }
+
+int nice(int pid, int prior)
+{
+    return sys_nice(pid, prior);
+}
