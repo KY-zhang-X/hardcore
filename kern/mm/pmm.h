@@ -77,6 +77,7 @@ void print_pgdir(void);
 
 extern struct Page *pages;
 extern size_t npage;
+extern size_t tpage;
 
 static inline ppn_t
 page2ppn(struct Page *page) {

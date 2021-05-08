@@ -208,8 +208,8 @@ trap_dispatch(struct trapframe *tf) {
                     panic("handle pgfault failed in kernel mode. ret=%d\n", ret);
                 }
                 cprintf("killed by kernel.\n");
-                panic("handle user mode pgfault failed. ret=%d\n", ret); 
-                do_exit(-E_KILLED);
+                // panic("handle user mode pgfault failed. ret=%d\n", ret);
+                kill_all_thread();
             }
         }
         break;
@@ -309,3 +309,42 @@ trap(struct trapframe *tf) {
     }
 }
 
+void kill_all_thread()
+{
+    int is_thread = current->is_thread;
+    // 如果页错误出在主线程，is_thread = 0 但还是需要杀掉所有的线程
+    for (int i = 1; i < MAX_THREAD; i++)
+        if (current->stack[i] != 0)
+        {
+            is_thread = 1;
+            break;
+        }
+    // 不是线程结束处理
+    if (!is_thread)
+    {
+        do_exit(-E_KILLED);
+        return;
+    }
+
+    // 找到主线程
+    struct proc_struct *father = current;
+    while (father->is_thread)
+        father = father->parent;
+
+    // 通过设置子线程的 PF_EXITING 标志位杀死进程，所有进程会在中断处理时被检测到这个位置引发 do_exit
+    // 重新设置所有子线程独立，再把子线程杀了
+    // 设置 is_thread 让子线程独立是因为在 exit 的时候 is_thread 会触发像主线程归还用户栈的操作
+    // 若主线程先被调度释放，子线程向父线程归还栈的时候会内存访问错误 。
+    for (int i = 1; i < MAX_THREAD; i++)
+        if (father->stack[i] != 0)
+        {
+            struct proc_struct *proc = find_proc(father->stack[i]);
+            // cprintf("proc %d will be killed\n", proc->pid);
+            proc->is_thread = 0;
+            do_kill(father->stack[i]);
+        }
+    // 直接杀了父进程
+    do_kill(father->pid);
+    // cprintf("proc %d will be killed\n", father->pid);
+    do_exit(-E_KILLED);
+}

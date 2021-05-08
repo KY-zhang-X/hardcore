@@ -37,6 +37,7 @@ struct context {
 #define PROC_NAME_LEN               50
 #define MAX_PROCESS                 4096
 #define MAX_PID                     (MAX_PROCESS * 2)
+#define MAX_THREAD 16
 
 extern list_entry_t proc_list;
 
@@ -67,6 +68,31 @@ struct proc_struct {
     uint32_t lab6_stride;                       // FOR LAB6 ONLY: the current stride of the process
     uint32_t lab6_priority;                     // FOR LAB6 ONLY: the priority of process, set by lab6_set_priority(uint32_t)
     struct files_struct *filesp;                // the file related info(pwd, files_count, files_array, fs_semaphore) of process
+    uint32_t vruntime;                          // cfs scheduler : virtual run time
+    uint32_t cfs_prior;                         // cfs scheduler : the prior of this process (less have more prior), the mininum vruntime procee will be schedule
+    int is_thread;                              // 标志该进程是否是一个子线程
+    int stack_num;                              // 标志该子线程占用了父进程的哪一个栈帧，is_thread = 1 才有效
+    int stack[MAX_THREAD];                      // 每个主进程能够开启16个线程（包括主线程（自己）在内），每个块为 0 表示该块的栈没有被占用，不为 0 表示被占用，且值是该子线程的pid
+};
+
+// used by system call
+struct proc_struct_user
+{
+    enum proc_state state;        // Process state
+    int pid;                      // Process ID
+    int runs;                     // the running times of Proces
+    volatile bool need_resched;   // bool value: need to be rescheduled to release CPU?
+    int parent;                   // the parent process
+    uint32_t flags;               // Process flag
+    char name[PROC_NAME_LEN + 1]; // Process name
+    uint32_t wait_state;          // waiting state
+    int cptr, yptr, optr;         // relations between processes
+    int time_slice;               // time slice for occupying the CPU
+    uint32_t vruntime;            // cfs scheduler : virtual run time
+    uint32_t cfs_prior;           // cfs scheduler : the prior of this process (less have more prior), the mininum vruntime procee will be schedule
+    int is_thread;                // 标志该进程是否是一个子线程
+    int total_page;               // 总页数
+    int free_page;                // 未被使用的页面数量
 };
 
 #define PF_EXITING                  0x00000001      // getting shutdown
@@ -97,8 +123,15 @@ int do_yield(void);
 int do_execve(const char *name, int argc, const char **argv);
 int do_wait(int pid, int *code_store);
 int do_kill(int pid);
+int do_clone(void *(*fn)(void *), void *arg, void (*exit)(int));
 //FOR LAB6, set the process's priority (bigger value will get more CPU time)
 void lab6_set_priority(uint32_t priority);
 int do_sleep(unsigned int time);
+int get_pdb(void *base);
+void pdb2pdb_user(struct proc_struct *proc, struct proc_struct_user *pdb_user);
+int current_have_kid();
+void kill_all_zombie_ch_process();
+int is_ancestral_thread(struct proc_struct *proc);
+int do_kill_all_thread(int pid);
 #endif /* !__KERN_PROCESS_PROC_H__ */
 

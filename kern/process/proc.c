@@ -134,6 +134,13 @@ alloc_proc(void) {
         proc->lab6_stride = 0;
         proc->lab6_priority = 0;
         proc->filesp = NULL;
+        proc->cfs_prior = 19;
+        proc->vruntime = 0;
+        proc->is_thread = 0;
+        for (int i = 0; i < MAX_THREAD; i++)
+            proc->stack[i] = 0;
+        proc->stack_num = 0;
+        proc->stack[0] = 1; //0号栈是主线程用的，不能被占用,这里不是主线程的pid也没事
     }
     return proc;
 }
@@ -537,9 +544,21 @@ do_exit(int error_code) {
         current->mm = NULL;
     }
     put_fs(current); //for LAB8
+
+    // 若是一个线程退出，向主进程归还栈空间
+    if (current->is_thread)
+    {
+        struct proc_struct *father = current->parent;
+        while (father->is_thread)
+            father = father->parent;
+        father->stack[current->stack_num] = 0;
+    }
+
     current->state = PROC_ZOMBIE;
     current->exit_code = error_code;
-    
+
+    // cprintf("proc %d exit\n", current->pid);
+
     bool intr_flag;
     struct proc_struct *proc;
     local_intr_save(intr_flag);
@@ -556,6 +575,7 @@ do_exit(int error_code) {
             if ((proc->optr = initproc->cptr) != NULL) {
                 initproc->cptr->yptr = proc;
             }
+            // cprintf("proc %d child %d be send to init\n", current->pid, proc->pid);
             proc->parent = initproc;
             initproc->cptr = proc;
             if (proc->state == PROC_ZOMBIE) {
@@ -910,6 +930,7 @@ repeat:
         current->state = PROC_SLEEPING;
         current->wait_state = WT_CHILD;
         schedule();
+        kill_all_zombie_ch_process();
         if (current->flags & PF_EXITING) {
             do_exit(-E_KILLED);
         }
@@ -1012,8 +1033,8 @@ init_main(void *arg) {
     if (pid <= 0) {
         panic("create user_main failed.\n");
     }
- extern void check_sync(void);
-    check_sync();                // check philosopher sync problem
+    //  extern void check_sync(void);
+    // check_sync();                // check philosopher sync problem
 
     while (do_wait(0, NULL) == 0) {
         schedule();
@@ -1111,5 +1132,239 @@ do_sleep(unsigned int time) {
     schedule();
 
     del_timer(timer);
+    return 0;
+}
+
+// 从pdb中抓取向用户显示的字段
+int get_pdb(void *base)
+{
+    struct proc_struct_user *pdb_user = (struct proc_struct_user *)base;
+    bool intr_flag;
+    // 在复制pdb表到用户空间的过程中不允许中断
+    local_intr_save(intr_flag);
+    {
+        pdb2pdb_user(idleproc, pdb_user);
+        pdb_user->total_page = tpage;
+        pdb_user->free_page = (int)pmm_manager->nr_free_pages();
+        pdb_user++;
+        list_entry_t *le = &proc_list;
+        while ((le = list_next(le)) != &proc_list)
+        {
+            struct proc_struct *proc = le2proc(le, list_link);
+            pdb2pdb_user(proc, pdb_user);
+            pdb_user++;
+        }
+    }
+    local_intr_restore(intr_flag);
+    return nr_process;
+}
+
+//执行proc_struct -> proc_struct_user 的复制过程
+void pdb2pdb_user(struct proc_struct *proc, struct proc_struct_user *pdb_user)
+{
+    pdb_user->state = proc->state;
+    pdb_user->pid = proc->pid;
+    pdb_user->runs = proc->runs;
+    pdb_user->need_resched = proc->need_resched;
+    if (proc->parent != NULL)
+        pdb_user->parent = proc->parent->pid;
+    pdb_user->flags = proc->flags;
+    for (int i = 0; i < PROC_NAME_LEN; i++)
+        pdb_user->name[i] = proc->name[i];
+    pdb_user->wait_state = proc->wait_state;
+    pdb_user->cptr = proc->cptr;
+    pdb_user->yptr = proc->yptr;
+    pdb_user->optr = proc->optr;
+    pdb_user->time_slice = proc->time_slice;
+    pdb_user->vruntime = proc->vruntime;
+    pdb_user->cfs_prior = proc->cfs_prior;
+    pdb_user->is_thread = proc->is_thread;
+}
+
+int do_clone(void *(*fn)(void *), void *arg, void (*exit)(int))
+{
+    int ret = -E_NO_FREE_PROC;
+    struct proc_struct *proc;
+    if (nr_process >= MAX_PROCESS)
+        goto fork_out;
+
+    ret = -E_NO_MEM;
+
+    // 新建一个空进程描述符
+    if ((proc = alloc_proc()) == NULL)
+        goto fork_out;
+
+    // 设置线程名称为 父线程名称-t
+    int i = 0;
+    for (i = 0; current->name[i] != '\0'; i++)
+        proc->name[i] = current->name[i];
+    proc->name[i] = '-';
+    proc->name[i + 1] = 't';
+    proc->name[i + 2] = '\0';
+
+    proc->is_thread = 1; //标志该进程是一个子线程
+
+    // 针对可能出现递归调用pthread_create的情况，找到不为线程的主进程
+    struct proc_struct *father = current;
+
+    while (father->is_thread)
+        father = father->parent;
+
+    // 如果不设置线程归属于调用clone的线程，直接指向主线程会导致子线程中没法调用join来等待
+    proc->parent = current;
+
+    // 在主线程里面找一块栈分配给该子线程
+    proc->stack_num = 1;
+    for (; proc->stack_num < MAX_THREAD; proc->stack_num++)
+        if (father->stack[proc->stack_num] == 0)
+        {
+            father->stack[proc->stack_num] = 1;
+            break;
+        }
+
+    assert(proc->stack_num != MAX_THREAD);
+
+    assert(current->wait_state == 0);
+
+    // 设置内核栈
+    if (setup_kstack(proc) != 0)
+        goto bad_fork_cleanup_proc;
+
+    // 文件系统直接指向父进程
+    if (copy_fs(CLONE_FS, proc) != 0)
+        goto bad_fork_cleanup_kstack;
+
+    // mm 直接指向父进程， 一个用户进程有1MB的栈空间，256页，一个线程给16页，包括原有的主线程的话，能开16个线程
+    // 但这样有个问题是需要记录其父进程的线程数量，才能知道吧栈设置到哪合适
+    if (copy_mm(CLONE_VM, proc) != 0)
+        goto bad_fork_cleanup_fs;
+
+    // !! 注意这个地址不是这个线程的地址，是上一个线程栈的栈底地址
+    // 给线程分配栈,一个进程16页
+    uint32_t thread_stack_top = USTACKTOP - (proc->stack_num) * 16 * PGSIZE;
+
+    // 预先给两页给新分配的线程
+    assert(pgdir_alloc_page(proc->mm->pgdir, thread_stack_top - PGSIZE, PTE_USER) != NULL);
+    assert(pgdir_alloc_page(proc->mm->pgdir, thread_stack_top - 2 * PGSIZE, PTE_USER) != NULL);
+
+    proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
+
+    struct trapframe *tf = proc->tf;
+    memset(tf, 0, sizeof(struct trapframe));
+    tf->tf_cs = USER_CS;
+    tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+
+    // 把栈往上抬4个字节,才开始放东西，否则栈会越界
+    // 先放exit的参数为0
+    *(uint32_t *)(thread_stack_top - 1 * sizeof(uint32_t)) = (uint32_t)0;
+    // 压入线程函数的参数地址
+    *(uint32_t *)(thread_stack_top - 2 * sizeof(uint32_t)) = (uint32_t)arg;
+    // 压入上一个函数的返回地址为 exit ，保证函数结束并没有显式调用 exit 时系统能帮助该线程退出。
+    *(uint32_t *)(thread_stack_top - 3 * sizeof(uint32_t)) = exit;
+    tf->tf_esp = thread_stack_top - 3 * sizeof(uint32_t);
+
+    // 设置 eip 指向当前函数开始执行
+    tf->tf_eip = fn;
+    tf->tf_eflags = FL_IF;
+    ret = 0;
+    tf->tf_regs.reg_eax = 0;
+    tf->tf_eflags |= FL_IF;
+
+    // context 在调度的时候会弹出 tf 内的寄存器，恢复程序执行
+    proc->context.eip = (uintptr_t)forkret;
+    proc->context.esp = (uintptr_t)(proc->tf);
+
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        proc->pid = get_pid();
+        hash_proc(proc);
+        set_links(proc);
+    }
+    local_intr_restore(intr_flag);
+
+    wakeup_proc(proc);
+
+    // 重新设置父线程的栈被该子线程占用
+    father->stack[proc->stack_num] = proc->pid;
+
+    ret = proc->pid;
+fork_out:
+    return ret;
+
+bad_fork_cleanup_fs: //for LAB8
+    put_fs(proc);
+bad_fork_cleanup_kstack:
+    put_kstack(proc);
+bad_fork_cleanup_proc:
+    kfree(proc);
+    goto fork_out;
+}
+
+int is_ancestral_thread(struct proc_struct *proc)
+{
+    if (proc->is_thread) //这只是个线程，不是祖宗线程
+        return 0;
+    for (int i = 1; i < MAX_THREAD; i++)
+        if (proc->stack[i] != 0)
+            return 1;
+    return 0; // 没有子线程，只是一个普通进程
+}
+
+int current_have_kid()
+{
+    struct proc_struct *proc = current->cptr;
+    for (; proc != NULL; proc = proc->optr)
+        return 1;
+    return 0;
+}
+
+void kill_all_zombie_ch_process()
+{
+    struct proc_struct *proc = current->cptr;
+    for (; proc != NULL; proc = proc->optr)
+        if (proc->state == PROC_ZOMBIE)
+            do_wait(proc->pid, NULL);
+    return;
+}
+
+// do_kill 的升级版，如果需要杀掉的进程有线程，那么会将其全部杀死
+int do_kill_all_thread(int pid)
+{
+    // 找不到进程直接返回
+    struct proc_struct *proc;
+    if ((proc = find_proc(pid)) == NULL)
+        return -E_INVAL;
+
+    int is_thread = proc->is_thread;
+    for (int i = 1; i < MAX_THREAD; i++)
+        if (proc->stack[i] != 0)
+        {
+            is_thread = 1;
+            break;
+        }
+    // 不是线程结束处理
+    if (!is_thread)
+        return do_kill(pid);
+
+    // 找到主线程
+    struct proc_struct *father = proc;
+    while (father->is_thread)
+        father = father->parent;
+
+    // 通过设置子线程的 PF_EXITING 标志位杀死进程，所有进程会在中断处理时被检测到这个位置引发 do_exit
+    // 重新设置所有子线程独立，再把子线程杀了
+    // 设置 is_thread 让子线程独立是因为在 exit 的时候 is_thread 会触发向主线程归还用户栈的操作
+    // 若主线程先被调度释放，子线程向父线程归还栈的时候会内存访问错误 。
+    for (int i = 1; i < MAX_THREAD; i++)
+        if (father->stack[i] != 0)
+        {
+            struct proc_struct *proc = find_proc(father->stack[i]);
+            // cprintf("proc %d will be killed\n", proc->pid);
+            proc->is_thread = 0;
+            do_kill(father->stack[i]);
+        }
+    // 直接杀了父进程
+    do_kill(father->pid);
     return 0;
 }

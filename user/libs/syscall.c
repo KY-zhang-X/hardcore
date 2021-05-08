@@ -143,3 +143,18 @@ int
 sys_dup(int fd1, int fd2) {
     return syscall(SYS_dup, fd1, fd2);
 }
+
+int sys_get_pdb(void *base)
+{
+    return syscall(SYS_get_pdb, base);
+}
+
+int sys_clone(int *thread_id, void *(*fn)(void *), void *arg, void (*exit)(int))
+{
+    return syscall(SYS_clone, thread_id, fn, arg, exit);
+}
+
+int sys_sem(semaphore_t *sem, int *value, int type)
+{
+    return syscall(SYS_sem, sem, value, type);
+}

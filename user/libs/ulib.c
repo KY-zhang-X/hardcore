@@ -77,6 +77,14 @@ gettime_msec(void) {
     return (unsigned int)sys_gettime();
 }
 
+int str_to_int(char *str)
+{
+  int value = 0;
+  for (int i = 0; str[i] != '\0'; i++)
+    value = value * 10 + str[i] - '0';
+  return value;
+}
+
 int
 __exec(const char *name, const char **argv) {
     int argc = 0;

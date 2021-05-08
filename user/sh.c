@@ -91,6 +91,7 @@ usage(void) {
     printf("usage: sh [command-file]\n");
 }
 
+// 关闭文件描述符 fd2 ，打开文件 filename
 int
 reopen(int fd2, const char *filename, uint32_t open_flags) {
     int ret, fd1;
@@ -211,12 +212,30 @@ runit:
         argv[0] = argv0;
     }
     argv[argc] = NULL;
-    return __exec(NULL, argv);
+    return __exec(argv[0], argv);
+}
+
+int in_backgroud(char *buffer)
+{
+    int i = 0;
+    while (buffer[i] != '\0')
+        i++;
+    do
+    {
+        if (buffer[i] == '&')
+        {
+            buffer[i] = '\0';
+            return 1;
+        }
+        if (buffer[i] == ' ')
+            break;
+    } while (i--);
+    return 0;
 }
 
 int
 main(int argc, char **argv) {
-    printf("user sh is running!!!");
+    printf("user sh is running!!!\n");
     int ret, interactive = 1;
     if (argc == 2) {
         if ((ret = reopen(0, argv[1], O_RDONLY)) != 0) {
@@ -228,26 +247,36 @@ main(int argc, char **argv) {
         usage();
         return -1;
     }
-    //shcwd = malloc(BUFSIZE);
+    // 以上命令是在sh启动的时候执行
+    // 两个参数就是 > sh xxx 重开一个命令行执行
+    // 或者直接 xxxx        在当前命令行执行
     assert(shcwd != NULL);
 
     char *buffer;
     while ((buffer = readline((interactive) ? "$ " : NULL)) != NULL) {
+        int run_in_backgroud = in_backgroud(buffer);
         shcwd[0] = '\0';
         int pid;
+        // 运行完fork 0 是子进程，去执行cmd 调用 exec 执行
         if ((pid = fork()) == 0) {
             ret = runcmd(buffer);
+            // 子进程的返回值，由父进程读取
             exit(ret);
         }
         assert(pid >= 0);
-        if (waitpid(pid, &ret) == 0) {
-            if (ret == 0 && shcwd[0] != '\0') {
-                ret = 0;
-            }
-            if (ret != 0) {
-                printf("error: %d - %e\n", ret, ret);
+        // 如果该命令不是跑在后台父进程等待子进程的结束
+        if (run_in_backgroud == 0)
+        {
+            if (waitpid(pid, &ret) == 0)
+            {
+                if (ret == 0 && shcwd[0] != '\0')
+                    ret = 0;
+                if (ret != 0)
+                    printf("error: %d - %e\n", ret, ret);
             }
         }
+        else
+            printf("proccess %d run in background\n", pid);
     }
     return 0;
 }

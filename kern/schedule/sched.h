@@ -4,6 +4,7 @@
 #include <defs.h>
 #include <list.h>
 #include <skew_heap.h>
+#include <rbtree.h>
 
 struct proc_struct;
 
@@ -57,6 +58,7 @@ struct run_queue {
     int max_time_slice;
     // For LAB6 ONLY
     skew_heap_entry_t *lab6_run_pool;
+    struct rb_root cfs_rb_tree;
 };
 
 void sched_init(void);

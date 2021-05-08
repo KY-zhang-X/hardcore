@@ -34,6 +34,7 @@ int kill(int pid);
 int getpid(void);
 void print_pgdir(void);
 int sleep(unsigned int time);
+int str_to_int(char *str);
 unsigned int gettime_msec(void);
 int __exec(const char *name, const char **argv);
 

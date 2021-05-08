@@ -10,10 +10,14 @@
 #include <stat.h>
 #include <dirent.h>
 #include <sysfile.h>
+#include <sem.h>
 
 static int
 sys_exit(uint32_t arg[]) {
     int error_code = (int)arg[0];
+    if (is_ancestral_thread(current)) //祖宗进程只有在所有子线程全部释放后才能退出
+        while (current_have_kid())    //只要有儿子就等着
+            do_wait(0, NULL);
     return do_exit(error_code);
 }
 
@@ -28,6 +32,11 @@ static int
 sys_wait(uint32_t arg[]) {
     int pid = (int)arg[0];
     int *store = (int *)arg[1];
+    if (pid == -1)
+    {
+        while (current_have_kid())
+            do_wait(0, store);
+    }
     return do_wait(pid, store);
 }
 
@@ -47,7 +56,7 @@ sys_yield(uint32_t arg[]) {
 static int
 sys_kill(uint32_t arg[]) {
     int pid = (int)arg[0];
-    return do_kill(pid);
+    return do_kill_all_thread(pid);
 }
 
 static int
@@ -157,29 +166,78 @@ sys_dup(uint32_t arg[]) {
     return sysfile_dup(fd1, fd2);
 }
 
+static int
+sys_get_pdb(uint32_t arg[]) {
+    void * base = (void *)arg[0];
+    return get_pdb(base);
+}
+
+static int
+sys_clone(uint32_t arg[])
+{
+    int *thread_id = (void *)arg[0];
+    void *(*fn)(void *) = (void *)arg[1];
+    void *argv = (void *)arg[2];
+    void (*exit)(int) = (void *)arg[3];
+    *thread_id = do_clone(fn, argv, exit);
+    if (*thread_id > 0)
+        return 0;
+    else
+        return -1;
+}
+
+static int
+sys_sem(uint32_t arg[])
+{
+    semaphore_t *sem = (semaphore_t *)arg[0];
+    int *value = (int *)arg[1];
+    int type = (int)arg[2];
+    switch (type)
+    {
+    case 0:
+        sem_init(sem, *value);
+        break;
+    case 1:
+        up(sem);
+        break;
+    case 2:
+        down(sem);
+        break;
+    case 3:
+        *value = sem->value;
+        break;
+    default:
+        return -1;
+    }
+    return 0;
+}
+
 static int (*syscalls[])(uint32_t arg[]) = {
-    [SYS_exit]              sys_exit,
-    [SYS_fork]              sys_fork,
-    [SYS_wait]              sys_wait,
-    [SYS_exec]              sys_exec,
-    [SYS_yield]             sys_yield,
-    [SYS_kill]              sys_kill,
-    [SYS_getpid]            sys_getpid,
-    [SYS_putc]              sys_putc,
-    [SYS_pgdir]             sys_pgdir,
-    [SYS_gettime]           sys_gettime,
+    [SYS_exit] sys_exit,
+    [SYS_fork] sys_fork,
+    [SYS_clone] sys_clone,
+    [SYS_wait] sys_wait,
+    [SYS_exec] sys_exec,
+    [SYS_yield] sys_yield,
+    [SYS_kill] sys_kill,
+    [SYS_getpid] sys_getpid,
+    [SYS_putc] sys_putc,
+    [SYS_pgdir] sys_pgdir,
+    [SYS_gettime] sys_gettime,
     [SYS_lab6_set_priority] sys_lab6_set_priority,
-    [SYS_sleep]             sys_sleep,
-    [SYS_open]              sys_open,
-    [SYS_close]             sys_close,
-    [SYS_read]              sys_read,
-    [SYS_write]             sys_write,
-    [SYS_seek]              sys_seek,
-    [SYS_fstat]             sys_fstat,
-    [SYS_fsync]             sys_fsync,
-    [SYS_getcwd]            sys_getcwd,
-    [SYS_getdirentry]       sys_getdirentry,
-    [SYS_dup]               sys_dup,
+    [SYS_sleep] sys_sleep,
+    [SYS_open] sys_open,
+    [SYS_close] sys_close,
+    [SYS_read] sys_read,
+    [SYS_write] sys_write,
+    [SYS_seek] sys_seek,
+    [SYS_fstat] sys_fstat,
+    [SYS_fsync] sys_fsync,
+    [SYS_getcwd] sys_getcwd,
+    [SYS_getdirentry] sys_getdirentry,
+    [SYS_dup] sys_dup,
+    [SYS_get_pdb] sys_get_pdb,
+    [SYS_sem] sys_sem,
 };
 
 #define NUM_SYSCALLS        ((sizeof(syscalls)) / (sizeof(syscalls[0])))

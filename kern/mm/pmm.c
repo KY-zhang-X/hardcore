@@ -38,6 +38,7 @@ static struct taskstate ts = {0};
 struct Page *pages;
 // amount of physical memory (in pages)
 size_t npage = 0;
+size_t tpage = 0; // 总共可用的空闲页
 
 // virtual address of boot-time page directory
 extern pde_t __boot_pgdir;
@@ -251,6 +252,7 @@ page_init(void) {
             }
         }
     }
+    tpage = pmm_manager->nr_free_pages();
 }
 
 //boot_map_segment - setup&enable the paging mechanism
