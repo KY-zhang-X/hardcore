@@ -63,15 +63,15 @@
 
 /* Gate descriptors for interrupts and traps */
 struct gatedesc {
-    unsigned gd_off_15_0 : 16;      // low 16 bits of offset in segment
-    unsigned gd_ss : 16;            // segment selector
-    unsigned gd_args : 5;           // # args, 0 for interrupt/trap gates
-    unsigned gd_rsv1 : 3;           // reserved(should be zero I guess)
-    unsigned gd_type : 4;           // type(STS_{TG,IG32,TG32})
-    unsigned gd_s : 1;              // must be 0 (system)
-    unsigned gd_dpl : 2;            // descriptor(meaning new) privilege level
-    unsigned gd_p : 1;              // Present
-    unsigned gd_off_31_16 : 16;     // high bits of offset in segment
+	unsigned gd_off_15_0 : 16;      // low 16 bits of offset in segment
+	unsigned gd_ss : 16;            // segment selector
+	unsigned gd_args : 5;           // # args, 0 for interrupt/trap gates
+	unsigned gd_rsv1 : 3;           // reserved(should be zero I guess)
+	unsigned gd_type : 4;           // type(STS_{TG,IG32,TG32})
+	unsigned gd_s : 1;              // must be 0 (system)
+	unsigned gd_dpl : 2;            // descriptor(meaning new) privilege level
+	unsigned gd_p : 1;              // Present
+	unsigned gd_off_31_16 : 16;     // high bits of offset in segment
 };
 
 /* *
@@ -95,7 +95,7 @@ struct gatedesc {
         (gate).gd_off_31_16 = (uint32_t)(off) >> 16;        \
     }
 
-/* Set up a call gate descriptor */
+ /* Set up a call gate descriptor */
 #define SETCALLGATE(gate, ss, off, dpl) {                   \
         (gate).gd_off_15_0 = (uint32_t)(off) & 0xffff;      \
         (gate).gd_ss = (ss);                                \
@@ -110,19 +110,19 @@ struct gatedesc {
 
 /* segment descriptors */
 struct segdesc {
-    unsigned sd_lim_15_0 : 16;      // low bits of segment limit
-    unsigned sd_base_15_0 : 16;     // low bits of segment base address
-    unsigned sd_base_23_16 : 8;     // middle bits of segment base address
-    unsigned sd_type : 4;           // segment type (see STS_ constants)
-    unsigned sd_s : 1;              // 0 = system, 1 = application
-    unsigned sd_dpl : 2;            // descriptor Privilege Level
-    unsigned sd_p : 1;              // present
-    unsigned sd_lim_19_16 : 4;      // high bits of segment limit
-    unsigned sd_avl : 1;            // unused (available for software use)
-    unsigned sd_rsv1 : 1;           // reserved
-    unsigned sd_db : 1;             // 0 = 16-bit segment, 1 = 32-bit segment
-    unsigned sd_g : 1;              // granularity: limit scaled by 4K when set
-    unsigned sd_base_31_24 : 8;     // high bits of segment base address
+	unsigned sd_lim_15_0 : 16;      // low bits of segment limit
+	unsigned sd_base_15_0 : 16;     // low bits of segment base address
+	unsigned sd_base_23_16 : 8;     // middle bits of segment base address
+	unsigned sd_type : 4;           // segment type (see STS_ constants)
+	unsigned sd_s : 1;              // 0 = system, 1 = application
+	unsigned sd_dpl : 2;            // descriptor Privilege Level
+	unsigned sd_p : 1;              // present
+	unsigned sd_lim_19_16 : 4;      // high bits of segment limit
+	unsigned sd_avl : 1;            // unused (available for software use)
+	unsigned sd_rsv1 : 1;           // reserved
+	unsigned sd_db : 1;             // 0 = 16-bit segment, 1 = 32-bit segment
+	unsigned sd_g : 1;              // granularity: limit scaled by 4K when set
+	unsigned sd_base_31_24 : 8;     // high bits of segment base address
 };
 
 #define SEG_NULL                                            \
@@ -146,47 +146,59 @@ struct segdesc {
 
 /* task state segment format (as described by the Pentium architecture book) */
 struct taskstate {
-    uint32_t ts_link;       // old ts selector
-    uintptr_t ts_esp0;      // stack pointers and segment selectors
-    uint16_t ts_ss0;        // after an increase in privilege level
-    uint16_t ts_padding1;
-    uintptr_t ts_esp1;
-    uint16_t ts_ss1;
-    uint16_t ts_padding2;
-    uintptr_t ts_esp2;
-    uint16_t ts_ss2;
-    uint16_t ts_padding3;
-    uintptr_t ts_cr3;       // page directory base
-    uintptr_t ts_eip;       // saved state from last task switch
-    uint32_t ts_eflags;
-    uint32_t ts_eax;        // more saved state (registers)
-    uint32_t ts_ecx;
-    uint32_t ts_edx;
-    uint32_t ts_ebx;
-    uintptr_t ts_esp;
-    uintptr_t ts_ebp;
-    uint32_t ts_esi;
-    uint32_t ts_edi;
-    uint16_t ts_es;         // even more saved state (segment selectors)
-    uint16_t ts_padding4;
-    uint16_t ts_cs;
-    uint16_t ts_padding5;
-    uint16_t ts_ss;
-    uint16_t ts_padding6;
-    uint16_t ts_ds;
-    uint16_t ts_padding7;
-    uint16_t ts_fs;
-    uint16_t ts_padding8;
-    uint16_t ts_gs;
-    uint16_t ts_padding9;
-    uint16_t ts_ldt;
-    uint16_t ts_padding10;
-    uint16_t ts_t;          // trap on task switch
-    uint16_t ts_iomb;       // i/o map base address
+	uint32_t ts_link;       // old ts selector
+	uintptr_t ts_esp0;      // stack pointers and segment selectors
+	uint16_t ts_ss0;        // after an increase in privilege level
+	uint16_t ts_padding1;
+	uintptr_t ts_esp1;
+	uint16_t ts_ss1;
+	uint16_t ts_padding2;
+	uintptr_t ts_esp2;
+	uint16_t ts_ss2;
+	uint16_t ts_padding3;
+	uintptr_t ts_cr3;       // page directory base
+	uintptr_t ts_eip;       // saved state from last task switch
+	uint32_t ts_eflags;
+	uint32_t ts_eax;        // more saved state (registers)
+	uint32_t ts_ecx;
+	uint32_t ts_edx;
+	uint32_t ts_ebx;
+	uintptr_t ts_esp;
+	uintptr_t ts_ebp;
+	uint32_t ts_esi;
+	uint32_t ts_edi;
+	uint16_t ts_es;         // even more saved state (segment selectors)
+	uint16_t ts_padding4;
+	uint16_t ts_cs;
+	uint16_t ts_padding5;
+	uint16_t ts_ss;
+	uint16_t ts_padding6;
+	uint16_t ts_ds;
+	uint16_t ts_padding7;
+	uint16_t ts_fs;
+	uint16_t ts_padding8;
+	uint16_t ts_gs;
+	uint16_t ts_padding9;
+	uint16_t ts_ldt;
+	uint16_t ts_padding10;
+	uint16_t ts_t;          // trap on task switch
+	uint16_t ts_iomb;       // i/o map base address
 } __attribute__((packed));
 
 #endif /* !__ASSEMBLER__ */
 
+// A linear address 'la' has a three-part structure as follows:
+//
+// +--------10------+-------10-------+---------12----------+
+// | Page Directory |   Page Table   | Offset within Page  |
+// |      Index     |     Index      |                     |
+// +----------------+----------------+---------------------+
+//  \--- PDX(la) --/ \--- PTX(la) --/ \---- PGOFF(la) ----/
+//  \----------- PPN(la) -----------/
+//
+// The PDX, PTX, PGOFF, and PPN macros decompose linear addresses as shown.
+// To construct a linear address la from PDX(la), PTX(la), and PGOFF(la),
+// use PGADDR(PDX(la), PTX(la), PGOFF(la)).
 
 // page directory index
 #define PDX(la) ((((uintptr_t)(la)) >> PDXSHIFT) & 0x3FF)
@@ -230,8 +242,8 @@ struct taskstate {
 #define PTE_PS          0x080                   // Page Size
 #define PTE_MBZ         0x180                   // Bits must be zero
 #define PTE_AVAIL       0xE00                   // Available for software use
-                                                // The PTE_AVAIL bits aren't used by the kernel or interpreted by the
-                                                // hardware, so user processes are allowed to set them arbitrarily.
+												// The PTE_AVAIL bits aren't used by the kernel or interpreted by the
+												// hardware, so user processes are allowed to set them arbitrarily.
 
 #define PTE_USER        (PTE_U | PTE_W | PTE_P)
 
