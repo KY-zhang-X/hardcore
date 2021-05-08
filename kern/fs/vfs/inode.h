@@ -26,6 +26,15 @@ struct iobuf;
  * vfs_open() and vfs_close(). Code above the VFS layer should not
  * need to worry about it.
  */
+
+/**
+ * in_info 表示包含不同文件系统特定的inode信息
+ * in_type inode所属的文件系统类型，和in_info对应
+ * ref_count inode的引用计数
+ * open_count 打开此inode对应文件的个数
+ * in_fs 抽象文件系统,包含访问文件系统的函数指针
+ * in_ops 抽象的inode操作，包含访问inode的函数指针
+ */
 struct inode {
     union {
         struct device __device_info;
@@ -150,6 +159,8 @@ void inode_kill(struct inode *node);
  *                      of the file and copy to the specified io buffer. 
  *                      Need not work on objects that are not
  *                      directories.
+ *                      计算相对于文件文件系统根目录的路径名，并将其复制到指定的io缓冲区。
+ *                      不需要在不是目录的对象上工作。
  *
  *****************************************
  *
@@ -174,6 +185,8 @@ struct inode_ops {
     int (*vop_write)(struct inode *node, struct iobuf *iob);
     int (*vop_fstat)(struct inode *node, struct stat *stat);
     int (*vop_fsync)(struct inode *node);
+    int (*vop_mkdir)(struct inode *node, const char *name);
+    int (*vop_link)(struct inode *node, const char *name, struct inode *link_node);
     int (*vop_namefile)(struct inode *node, struct iobuf *iob);
     int (*vop_getdirentry)(struct inode *node, struct iobuf *iob);
     int (*vop_reclaim)(struct inode *node);
@@ -181,6 +194,7 @@ struct inode_ops {
     int (*vop_tryseek)(struct inode *node, off_t pos);
     int (*vop_truncate)(struct inode *node, off_t len);
     int (*vop_create)(struct inode *node, const char *name, bool excl, struct inode **node_store);
+    int (*vop_unlink)(struct inode *node, const char *name);
     int (*vop_lookup)(struct inode *node, char *path, struct inode **node_store);
     int (*vop_ioctl)(struct inode *node, int op, void *data);
 };
@@ -204,6 +218,8 @@ void inode_check(struct inode *node, const char *opstr);
 #define vop_write(node, iob)                                        (__vop_op(node, write)(node, iob))
 #define vop_fstat(node, stat)                                       (__vop_op(node, fstat)(node, stat))
 #define vop_fsync(node)                                             (__vop_op(node, fsync)(node))
+#define vop_mkdir(node, name)                                       (__vop_op(node, mkdir)(node, name))
+#define vop_link(node, name, link_node)                             (__vop_op(node, link)(node, name, link_node))
 #define vop_namefile(node, iob)                                     (__vop_op(node, namefile)(node, iob))
 #define vop_getdirentry(node, iob)                                  (__vop_op(node, getdirentry)(node, iob))
 #define vop_reclaim(node)                                           (__vop_op(node, reclaim)(node))
@@ -212,6 +228,7 @@ void inode_check(struct inode *node, const char *opstr);
 #define vop_tryseek(node, pos)                                      (__vop_op(node, tryseek)(node, pos))
 #define vop_truncate(node, len)                                     (__vop_op(node, truncate)(node, len))
 #define vop_create(node, name, excl, node_store)                    (__vop_op(node, create)(node, name, excl, node_store))
+#define vop_unlink(node, name)                                      (__vop_op(node, unlink)(node, name))
 #define vop_lookup(node, path, node_store)                          (__vop_op(node, lookup)(node, path, node_store))
 
 
@@ -233,12 +250,23 @@ void inode_check(struct inode *node, const char *opstr);
 #define vop_open_inc(node)                                          inode_open_inc(node)
 #define vop_open_dec(node)                                          inode_open_dec(node)
 
-
+/**
+ * @brief 返回当前inode引用计数node->ref_count
+ * 
+ * @param node 
+ * @return int 
+ */
 static inline int
 inode_ref_count(struct inode *node) {
     return node->ref_count;
 }
 
+/**
+ * @brief 返回打开此inode对应文件个数node->open_count
+ * 
+ * @param node 
+ * @return int 
+ */
 static inline int
 inode_open_count(struct inode *node) {
     return node->open_count;

@@ -13,6 +13,13 @@ static struct inode *bootfs_node = NULL;
 extern void vfs_devlist_init(void);
 
 // __alloc_fs - allocate memory for fs, and set fs type
+
+/**
+ * @brief 给fs分配一块内存区域，被alloc_fs调用
+ * 
+ * @param type 
+ * @return struct fs* 
+ */
 struct fs *
 __alloc_fs(int type) {
     struct fs *fs;
@@ -22,7 +29,7 @@ __alloc_fs(int type) {
     return fs;
 }
 
-// vfs_init -  vfs initialize
+// vfs初始化
 void
 vfs_init(void) {
     sem_init(&bootfs_sem, 1);
@@ -55,6 +62,9 @@ change_bootfs(struct inode *node) {
 }
 
 // vfs_set_bootfs - change the dir of file system
+/**
+ *  
+ */
 int
 vfs_set_bootfs(char *fsname) {
     struct inode *node = NULL;
@@ -76,6 +86,9 @@ vfs_set_bootfs(char *fsname) {
 }
 
 // vfs_get_bootfs - get the inode of bootfs
+/**
+ * 返回主文件系统根节点的inode
+ */
 int
 vfs_get_bootfs(struct inode **node_store) {
     struct inode *node = NULL;

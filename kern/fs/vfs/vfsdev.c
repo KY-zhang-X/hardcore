@@ -12,6 +12,11 @@
 #include <assert.h>
 
 // device info entry in vdev_list 
+/**
+ * 此数据结构用双向链表将inode和device联通起来
+ * ucore可以通过此链表访问所有的设备文件 
+ * 可以找到device对应的inode
+ */ 
 typedef struct {
     const char *devname;
     struct inode *devnode;
@@ -23,7 +28,7 @@ typedef struct {
 #define le2vdev(le, member)                         \
     to_struct((le), vfs_dev_t, member)
 
-static list_entry_t vdev_list;     // device info list in vfs layer
+static list_entry_t vdev_list;     // vfs层设备链表
 static semaphore_t vdev_list_sem;
 
 static void
@@ -43,6 +48,11 @@ vfs_devlist_init(void) {
 }
 
 // vfs_cleanup - finally clean (or sync) fs
+
+/**
+ * @brief 将文件系统同步到硬盘
+ * 
+ */
 void
 vfs_cleanup(void) {
     if (!list_empty(&vdev_list)) {
@@ -64,6 +74,14 @@ vfs_cleanup(void) {
  * vfs_get_root - Given a device name (stdin, stdout, etc.), hand
  *                back an appropriate inode.
  */
+
+/**
+ * @brief 根据设备名称获取对应的root的inode
+ * 
+ * @param devname 设备名称
+ * @param node_store 接受inode地址
+ * @return int 成功返回0
+ */
 int
 vfs_get_root(const char *devname, struct inode **node_store) {
     assert(devname != NULL);
@@ -72,6 +90,7 @@ vfs_get_root(const char *devname, struct inode **node_store) {
         lock_vdev_list();
         {
             list_entry_t *list = &vdev_list, *le = list;
+            /* 逐个查询设备链表 */
             while ((le = list_next(le)) != list) {
                 vfs_dev_t *vdev = le2vdev(le, vdev_link);
                 if (strcmp(devname, vdev->devname) == 0) {
@@ -101,6 +120,10 @@ vfs_get_root(const char *devname, struct inode **node_store) {
 /*
  * vfs_get_devname - Given a filesystem, hand back the name of the device it's mounted on.
  */
+
+/**
+ * @brief 获得文件系统挂载的设备名
+ */
 const char *
 vfs_get_devname(struct fs *fs) {
     assert(fs != NULL);
@@ -117,6 +140,10 @@ vfs_get_devname(struct fs *fs) {
 /*
  * check_devname_confilct - Is there alreadily device which has the same name?
  */
+
+/**
+ * @brief 检查是否已存在devname的设备
+ */
 static bool
 check_devname_conflict(const char *devname) {
     list_entry_t *list = &vdev_list, *le = list;
@@ -130,13 +157,9 @@ check_devname_conflict(const char *devname) {
 }
 
 
-/*
-* vfs_do_add - Add a new device to the VFS layer's device table.
-*
-* If "mountable" is set, the device will be treated as one that expects
-* to have a filesystem mounted on it, and a raw device will be created
-* for direct access.
-*/
+/**
+ * @brief 在vfs层增加一个设备/文件(在设备链表增加一个表项)
+ */
 static int
 vfs_do_add(const char *devname, struct inode *devnode, struct fs *fs, bool mountable) {
     assert(devname != NULL);
@@ -179,8 +202,12 @@ failed_cleanup_name:
 }
 
 /*
- * vfs_add_fs - Add a new fs,  by name. See  vfs_do_add information for the description of
- *              mountable.
+ * Add a filesystem that does not have an underlying device.
+ * This is used for emufs(not implementation???), but might also be used for network
+ * filesystems and the like.
+ */
+/*
+ * vfs_add_fs - 增加一个文件系统
  */
 int
 vfs_add_fs(const char *devname, struct fs *fs) {
@@ -188,8 +215,7 @@ vfs_add_fs(const char *devname, struct fs *fs) {
 }
 
 /*
- * vfs_add_dev - Add a new device, by name. See  vfs_do_add information for the description of
- *               mountable.
+ * vfs_add_dev - 增加一个新的设备
  */
 int
 vfs_add_dev(const char *devname, struct inode *devnode, bool mountable) {
@@ -197,8 +223,7 @@ vfs_add_dev(const char *devname, struct inode *devnode, bool mountable) {
 }
 
 /*
- * find_mount - Look for a mountable device named DEVNAME.
- *              Should already hold vdev_list lock.
+ * find_mount - 找到设备名devname对应的挂载的设备，vdev_store存储表项
  */
 static int
 find_mount(const char *devname, vfs_dev_t **vdev_store) {
@@ -219,6 +244,12 @@ find_mount(const char *devname, vfs_dev_t **vdev_store) {
  *             set up the filesystem and hand back a struct fs.
  *
  * The DATA argument is passed through unchanged to MOUNTFUNC.
+ */
+
+/**
+ * @brief 
+ * vfs层挂载一个设备（初始化设备）
+ * 需要先调用vfs_do_add将设备加入设备链表
  */
 int
 vfs_mount(const char *devname, int (*mountfunc)(struct device *dev, struct fs **fs_store)) {
@@ -246,8 +277,9 @@ out:
 }
 
 /*
- * vfs_unmount - Unmount a filesystem/device by name.
- *               First calls FSOP_SYNC on the filesystem; then calls FSOP_UNMOUNT.
+ * 通过设备名称卸载filesystem/device 
+ * 先调用fsop_sync
+ * 在调用fsop_unmount
  */
 int
 vfs_unmount(const char *devname) {
@@ -263,9 +295,12 @@ vfs_unmount(const char *devname) {
     }
     assert(vdev->devname != NULL && vdev->mountable);
 
-    if ((ret = fsop_sync(vdev->fs)) != 0) {
+    /* 将未保存数据写回磁盘 */
+    if ((ret = fsop_sync(vdev->fs)) != 0) { 
         goto out;
     }
+
+    /* 调用对应的卸载函数 */
     if ((ret = fsop_unmount(vdev->fs)) == 0) {
         vdev->fs = NULL;
         cprintf("vfs: unmount %s.\n", vdev->devname);
@@ -277,7 +312,8 @@ out:
 }
 
 /*
- * vfs_unmount_all - Global unmount function.
+ * 卸载vfs层所有设备
+ * 和vfs_unmount类似
  */
 int
 vfs_unmount_all(void) {
@@ -285,6 +321,7 @@ vfs_unmount_all(void) {
         lock_vdev_list();
         {
             list_entry_t *list = &vdev_list, *le = list;
+            /* 遍历设备链表，逐个卸载 */ 
             while ((le = list_next(le)) != list) {
                 vfs_dev_t *vdev = le2vdev(le, vdev_link);
                 if (vdev->mountable && vdev->fs != NULL) {

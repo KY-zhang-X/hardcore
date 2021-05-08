@@ -8,13 +8,16 @@ int main(int argc, char *argv[]);
 static int
 initfd(int fd2, const char *path, uint32_t open_flags) {
     int fd1, ret;
-    if ((fd1 = open(path, open_flags)) < 0) {
-        return fd1;
-    }
-    if (fd1 != fd2) {
-        close(fd2);
-        ret = dup2(fd1, fd2);
-        close(fd1);
+    struct stat __stat, *stat = &__stat;
+    if((ret = fstat(fd2, stat)) != 0){
+        if ((fd1 = open(path, open_flags)) < 0) {
+            return fd1;
+        }
+        if (fd1 != fd2) {
+            close(fd2);
+            ret = dup2(fd1, fd2);
+            close(fd1);
+        }
     }
     return ret;
 }
@@ -28,6 +31,7 @@ umain(int argc, char *argv[]) {
     if ((fd = initfd(1, "stdout:", O_WRONLY)) < 0) {
         warn("open <stdout> failed: %e.\n", fd);
     }
+
     int ret = main(argc, argv);
     exit(ret);
 }
