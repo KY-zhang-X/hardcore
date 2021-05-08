@@ -110,6 +110,7 @@ struct gatedesc {
 
 /* segment descriptors */
 struct segdesc {
+
 	unsigned sd_lim_15_0 : 16;      // low bits of segment limit
 	unsigned sd_base_15_0 : 16;     // low bits of segment base address
 	unsigned sd_base_23_16 : 8;     // middle bits of segment base address
@@ -186,6 +187,7 @@ struct taskstate {
 } __attribute__((packed));
 
 #endif /* !__ASSEMBLER__ */
+
 
 // A linear address 'la' has a three-part structure as follows:
 //

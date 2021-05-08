@@ -25,6 +25,7 @@ volatile int swap_init_ok = 0;
 
 unsigned int swap_page[CHECK_VALID_VIR_PAGE_NUM];
 
+
 unsigned int swap_in_seq_no[MAX_SEQ_NO], swap_out_seq_no[MAX_SEQ_NO];
 
 static void check_swap(void);
@@ -62,6 +63,7 @@ swap_init_mm(struct mm_struct *mm)
 int
 swap_tick_event(struct mm_struct *mm)
 {
+
 	return sm->tick_event(mm);
 }
 
@@ -163,6 +165,7 @@ check_content_set(void)
 static inline int
 check_content_access(void)
 {
+
 	int ret = sm->check_swap();
 	return ret;
 }

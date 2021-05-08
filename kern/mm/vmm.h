@@ -5,6 +5,7 @@
 #include <list.h>
 #include <memlayout.h>
 #include <sync.h>
+
 #include <proc.h>
 #include <sem.h>
 
@@ -38,7 +39,6 @@ struct mm_struct {
 	int mm_count;                  // the number ofprocess which shared the mm
 	semaphore_t mm_sem;            // mutex for using dup_mmap fun to duplicat the mm 
 	int locked_by;                 // the lock owner process's pid
-
 };
 
 struct vma_struct *find_vma(struct mm_struct *mm, uintptr_t addr);
