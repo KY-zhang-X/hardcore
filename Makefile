@@ -328,12 +328,15 @@ dbg4ec: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 debug: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) -S -s -parallel stdio $(QEMUOPTS) -serial null &
 	$(V)sleep 2
-	$(V)$(TERMINAL) -e "$(GDB) -q -x tools/gdbinit"
+#	$(V)$(TERMINAL) -e "$(GDB) -q -x tools/gdbinit"
 
 debug-nox: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) -S -s -serial mon:stdio $(QEMUOPTS) -nographic &
-	$(V)sleep 2
-	$(V)$(TERMINAL) -e "$(GDB) -q -x tools/gdbinit"
+#	$(V)sleep 2
+#	$(V)$(TERMINAL) -e "$(GDB) -q -x tools/gdbinit"
+
+gdb: 
+	$(GDB) -q -x tools/gdbinit
 
 RUN_PREFIX	:= _binary_$(OBJDIR)_$(USER_PREFIX)
 MAKEOPTS	:= --quiet --no-print-directory
